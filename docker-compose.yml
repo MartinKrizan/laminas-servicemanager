@@ -1,0 +1,8 @@
+services:
+  app:
+    build:
+      context: .
+    volumes:
+      - .:/var/www
+    ports:
+      - "20300:80"
