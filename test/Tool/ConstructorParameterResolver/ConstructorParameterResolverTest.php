@@ -21,6 +21,8 @@ use LaminasTest\ServiceManager\AbstractFactory\TestAsset\SampleInterface;
 use LaminasTest\ServiceManager\AbstractFactory\TestAsset\ValidatorPluginManager;
 use LaminasTest\ServiceManager\TestAsset\ClassDependingOnAnInterface;
 use LaminasTest\ServiceManager\TestAsset\ClassWithConstructorWithOnlyOptionalArguments;
+use LaminasTest\ServiceManager\TestAsset\ClassWithServiceAliasAttribute;
+use LaminasTest\ServiceManager\TestAsset\SampleFactory;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -95,6 +97,27 @@ final class ConstructorParameterResolverTest extends TestCase
         self::assertInstanceOf(ServiceFromContainerConstructorParameter::class, $parameters[0]);
         $parameter = $parameters[0];
         self::assertSame(FactoryInterface::class, $parameter->serviceName);
+    }
+
+    public function testWillResolveServiceBasedOnAttribute(): void
+    {
+        $container = $this->createMock(ContainerInterface::class);
+        $container
+            ->expects(self::exactly(2))
+            ->method('has')
+            ->willReturnMap([
+                ['config', false],
+                [SampleFactory::class, true],
+            ]);
+
+        $parameters = $this->resolver->resolveConstructorParameterServiceNamesOrFallbackTypes(
+            ClassWithServiceAliasAttribute::class,
+            $container
+        );
+        self::assertCount(1, $parameters);
+        self::assertInstanceOf(ServiceFromContainerConstructorParameter::class, $parameters[0]);
+        $parameter = $parameters[0];
+        self::assertSame(SampleFactory::class, $parameter->serviceName);
     }
 
     public function testRaisesExceptionWhenUnableToResolveATypeHintedService(): void

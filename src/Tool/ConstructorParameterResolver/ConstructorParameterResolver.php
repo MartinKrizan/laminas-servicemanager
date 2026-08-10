@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace Laminas\ServiceManager\Tool\ConstructorParameterResolver;
 
 use ArrayAccess;
+use Laminas\ServiceManager\Attributes\ServiceAlias;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Psr\Container\ContainerInterface;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionParameter;
 
+use function array_find;
 use function array_map;
 use function assert;
 use function class_exists;
 use function in_array;
 use function interface_exists;
+use function is_string;
 use function sprintf;
 
 /**
@@ -110,20 +114,29 @@ final class ConstructorParameterResolver implements ConstructorParameterResolver
         string $className,
         array $aliases
     ): FallbackConstructorParameter|ServiceFromContainerConstructorParameter {
-        $type = $parameter->getType();
-        $type = $type instanceof ReflectionNamedType ? $type->getName() : null;
+        $serviceAliasAttribute = array_find($parameter->getAttributes(), function (ReflectionAttribute $attribute): bool {
+                return $attribute->name === ServiceAlias::class;
+        });
 
-        if ($type === null || (! class_exists($type) && ! interface_exists($type))) {
-            if (! $parameter->isDefaultValueAvailable()) {
-                throw new ServiceNotFoundException(sprintf(
-                    'Unable to create service "%s"; unable to resolve parameter "%s" '
-                    . 'to a class, interface, or array type',
-                    $className,
-                    $parameter->getName()
-                ));
+        if ($serviceAliasAttribute instanceof ReflectionAttribute) {
+            $type = $serviceAliasAttribute->getArguments()[0];
+            assert(is_string($type));
+        } else {
+            $type = $parameter->getType();
+            $type = $type instanceof ReflectionNamedType ? $type->getName() : null;
+
+            if ($type === null || (! class_exists($type) && ! interface_exists($type))) {
+                if (! $parameter->isDefaultValueAvailable()) {
+                    throw new ServiceNotFoundException(sprintf(
+                        'Unable to create service "%s"; unable to resolve parameter "%s" '
+                        . 'to a class, interface, or array type',
+                        $className,
+                        $parameter->getName()
+                    ));
+                }
+
+                return new FallbackConstructorParameter($parameter->getDefaultValue());
             }
-
-            return new FallbackConstructorParameter($parameter->getDefaultValue());
         }
 
         $type = $aliases[$type] ?? $type;
